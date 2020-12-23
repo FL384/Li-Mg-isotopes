@@ -1,0 +1,250 @@
+# 
+#==============================================
+# Li and Mg model
+#==============================================
+# A diagenetic model for Li and Mg isotopes
+
+require(deSolve)
+
+
+# ------------------------------------------------------ #
+# --------------------- diagenesis --------------------- #
+# ------------------------------------------------------ #
+
+# ==================== Bottom water properties ==========================================
+BW_Temp                   <- 12                                # temperature deg C 
+BW_Sal                    <- 35                                # Salinity
+BW_Pr                     <- 500                               # pressure (bar)
+D_sw                      <-  1047.92                          # bottom water density at {T,S,P} (kg/m^3)
+
+BW_Mg                     <- 53/1e3                            # mmol/cm^3
+BW_Li                     <- 26/1e6                             # mmol/cm^3
+
+BW_d26Mg	          <- -0.8                                                 #  
+Mg_standard	          <- 0.1101/0.7899	                                  # shoud check the best value
+BW_Mg26_Mg24	          <- (BW_d26Mg / 1000 + 1) * Mg_standard	          # 
+BW_Mg24                    <- BW_Mg / (1 + BW_Mg26_Mg24 + 0.1/0.7899)             # 
+BW_Mg26		          <- BW_Mg24 * BW_Mg26_Mg24                               # 
+alphaMg                   <- 0.7/1000
+
+
+BW_d7Li	                  <- 15                                                   #  
+Li_standard	          <- 0.92275/0.07225	                                  # shoud check the best value
+BW_Li7_Li6	          <- (BW_d7Li / 1000 + 1) * Li_standard          # 
+BW_Li6                    <- BW_Li / (1 + BW_Li7_Li6)                    # 
+BW_Li7		          <- BW_Li6 * BW_Li7_Li6                         # 
+alphaLi                   <- -22/1000
+
+
+
+# ===================== Caculation of diffusion coeffiecients ==================================================================================================
+
+    
+
+DLi       	          <- 220.2357      #cm*cm/yr            
+DMg			  <- 155.1455      #cm*cm/yr 
+
+
+kMg                       <- 1e-3
+kLi                       <- 1e-2
+# ----------------------------------------------------------------------------- #
+# --------------------- setup model domain and properties --------------------- #
+# ----------------------------------------------------------------------------- #
+
+L                         <- 300                            # size of sediment column (cm) 300
+N                         <- 50                             # number of grid layers 
+dbl                       <- 0.2                            # thickness of diffusive boundary layer (cm)
+
+por.0                     <- 0.66                           # porosity at SWI
+por.inf                   <- 0.66                           # porosity at infinite depth
+por_coeff                 <- 5.301                          # attenuation coefficient for porosity profile
+rho_sed                   <- 2.5                            # sediment density (g/cm^3)
+v.0                       <- 0.1                            # solid-phase advection velocity at SWI (cm/y) 0.2
+v.inf                     <- NULL                           # solid-phase advection velocity at infinite depth (cm/y)
+
+
+
+
+grid_dx.aux          <- c(0.1500198,  0.3144043,  0.3445089,  0.3774961,  0.4136418,  0.4532486,  0.4966477,  0.5442024,  0.5963105, 0.6534080,  0.7159727,  0.7845280,  0.8596476,  0.9419600,  1.0321539,  1.1309840,  1.2392772,  1.3579396, 1.4879641,  1.6304386,  1.7865553,  1.9576203,  2.1450650,  2.3504578,  2.5755172,  2.8221264,  3.0923487, 3.3884452,  3.7128933,  4.0684077,  4.4579631,  4.8848189,  5.3525467,  5.8650601,  6.4266473,  7.0420073, 7.7162887,  8.4551335,  9.2647237, 10.1518331, 11.1238845, 12.1890111, 13.3561249, 14.6349914, 16.0363111,17.5718090, 19.2543328, 21.0979605, 23.1181180, 25.3317082, 13.2445354)
+grid_dx              <- c(0.3000397,  0.3287689,  0.3602489,  0.3947432,  0.4325404,  0.4739567,  0.5193387,  0.5690661,  0.6235549,
+  0.6832611,  0.7486843,  0.8203718,  0.8989234,  0.9849965,  1.0793113,  1.1826567,  1.2958977,  1.4199816,
+  1.5559467,  1.7049306,  1.8681800,  2.0470606,  2.2430694,  2.4578462,  2.6931882,  2.9510646,  3.2336329,
+  3.5432575,  3.8825290,  4.2542863,  4.6616398,  5.1079980,  5.5970955,  6.1330247,  6.7202699,  7.3637446,
+  8.0688328,  8.8414342,  9.6880131, 10.6156531, 11.6321159, 12.7459063, 13.9663436, 15.3036393, 16.7689829,
+ 18.3746351, 20.1340306, 22.0618905, 24.1743455, 26.4890709)
+
+
+grid_x.mid <- c(0.1500198,   0.4644241,   0.8089330,   1.1864291,   1.6000709,   2.0533195,   2.5499672,   3.0941696,3.6904801,   4.3438881,   5.0598608,   5.8443888,   6.7040364,   7.6459964,   8.6781503,   9.8091343,11.0484115,  12.4063511,  13.8943152,  15.5247539,  17.3113091,  19.2689294,  21.4139944,  23.7644523,26.3399695,  29.1620959,  32.2544446,  35.6428898,  39.3557831,  43.4241907,  47.8821538,  52.7669727,58.1195194,  63.9845795,  70.4112268,  77.4532340,  85.1695228,  93.6246563, 102.8893799, 113.0412130,124.1650975, 136.3541086, 149.7102335, 164.3452250, 180.3815361, 197.9533451, 217.2076779, 238.3056384,261.4237564, 286.7554646)
+
+svf.grid_mid          <- rep((1-por.0),N)
+svf.grid_int          <- rep((1-por.0),N)
+por.grid_int          <- rep(por.0,N)
+por.grid_mid          <- rep(por.0,N)
+
+v.grid_int        <- rep(v.0,N)
+v.grid_mid        <- rep(v.0,N)
+u.grid_int        <- rep(v.0,N)
+u.grid_mid        <- rep(v.0,N)
+
+tort                      <- 1 - 2*log(por.grid$int)                                 # calculate tortuosity from porosity
+f.grid                    <- (1-por.grid$mid)/por.grid$mid
+
+
+
+
+
+ trans.1D               <- function (C.up,comp) {
+  S                      <- comp[1:N]
+ Db.grid                  <-0
+  fluxS                   <- -Db.grid*diff(c(C.up,S,S[N]))/grid_dx.aux  
+
+  tranS                   <- -diff(c(fluxS*svf.grid_int))/grid_dx/svf.grid_mid - diff(c(C.up*svf.grid_int[1]*v.grid_int[1],S*svf.grid_mid*v.grid_mid))/grid_dx/svf.grid_mid
+
+  return(tranS)
+}
+
+
+ tranl.1D               <- function (C.up,comp,D) {
+  S                      <- comp[1:N]
+
+
+  fluxS                   <- -D*diff(c(C.up,S,S[N]))/grid_dx.aux  
+
+  tranS                   <- -diff(c(fluxS*por.grid_int))/grid_dx/por.grid_mid - diff(c(C.up*por.grid_int[1]*u.grid_int[1],S*por.grid_mid*u.grid_mid))/grid_dx/por.grid_mid
+
+  return(tranS)
+}
+
+
+# ------------------------------------------------------------- #
+# --------------------- model formulation --------------------- #
+# ------------------------------------------------------------- #
+# ===================== function defining system of differential equations ==========================
+Pmodel                    <- function (t = 0, Conc, pars = NULL) 
+{
+  # pass in intial concentrations
+  Mg26_w                   <- Conc[(0*N+1):(1*N)]  
+  Mg24_w                   <- Conc[(1*N+1):(2*N)] 
+  Mg26_s                   <- Conc[(2*N+1):(3*N)]
+  Mg24_s                   <- Conc[(3*N+1):(4*N)]
+  
+
+  Li7_w                    <- Conc[(4*N+1):(5*N)]  
+  Li6_w                    <- Conc[(5*N+1):(6*N)]
+  Li7_s                    <- Conc[(6*N+1):(7*N)]
+  Li6_s                    <- Conc[(7*N+1):(8*N)]
+
+  
+  # transport terms
+  tranMg26_s                <- trans.1D(comp = Mg26_s, C.up = 0)
+
+  
+  tranMg24_s                <- trans.1D(comp = Mg24_s, C.up = 0)
+
+  
+  tranMg26_w                <- tranl.1D(C.up=BW_Mg26,comp=Mg26_w,D=DMg/tort)
+  tranMg24_w                <- tranl.1D(C.up=BW_Mg24,comp=Mg24_w,D=DMg/tort)
+  
+ 
+  tranLi7_s                <- trans.1D(comp = Li7_s, C.up = 0)
+  tranLi6_s                <- trans.1D(comp = Li6_s, C.up = 0)
+
+
+  tranLi7_w                <- tranl.1D(C.up=BW_Li7,comp=Li7_w,D=DLi/tort)
+  tranLi6_w                <- tranl.1D(C.up=BW_Li6,comp=Li6_w,D=DLi/tort)
+
+
+ 
+  reacMg24                   <- kMg*Mg24_w
+
+  reacMg26                   <- kMg*Mg26_w*(1+alphaMg)
+
+  reacLi6                   <-  kLi*Li6_w
+
+  reacLi7                   <-  kLi*Li7_w*(1+alphaLi)
+ 
+  # differential equations
+ 
+  dMg26_w                    <- tranMg26_w - reacMg26
+  dMg24_w                    <- tranMg24_w - reacMg24
+  dMg26_s                    <- tranMg26_s + f.grid*reacMg26
+  dMg24_s                    <- tranMg24_s + f.grid*reacMg24
+
+
+
+
+  dLi7_w                   <- tranLi7_w - reacLi7
+  
+  dLi6_w                    <- tranLi6_w - reacLi6
+  
+  dLi7_s                    <- tranLi7_s + f.grid*reacLi7
+  dLi6_s                    <- tranLi6_s + f.grid*reacLi6
+
+
+  
+  return(list(c(dMg26_w=dMg26_w,dMg24_w=dMg24_w,dMg26_s=dMg26_s,dMg24_s=dMg24_s, dLi7_w=  dLi7_w, dLi6_w=dLi6_w, dLi7_s=dLi7_s,dLi6_s=dLi6_s)))
+  
+  
+}
+
+
+
+
+# ---------------------------------------------------------- #
+# --------------------- model solution --------------------- #
+# ---------------------------------------------------------- #
+# initial guess of state variables, equivalent to bottom water values
+Mg26_w                   <-  rep(0,N)
+Mg24_w                  <-  rep(BW_Mg24,N)
+Mg26_s                   <-  rep(0,N)
+Mg24_s                   <-  rep(0,N)
+Li7_w                   <- rep(0,N)
+Li6_w                       <- rep(0,N)
+Li7_s                    <- rep(0,N)
+Li6_s                   <- rep(0,N)
+
+Conc                    <- c(Mg26_w ,Mg24_w,Mg26_s,Mg24_s,Li7_w,Li6_w ,  Li7_s,   Li6_s)
+
+# --------------------- run model ----------------------------------------------------------------------------------------------------
+times                     <- seq(0, 2000000, by = 100000) 
+system.time (sol  <- ode.1D (y=Conc, time=times, func=Pmodel, maxstep = 10000, parms = NULL,nspec=8,method="vode",rtol = 1e-14, atol = 1e-14,verbose =TRUE,mf=22))
+
+# show run time, sol contains the solution
+
+#---------------------- collecting results -------------------------------------------------------------------------------------------
+Mg26_w                  <- sol[21, (0*N + 2):(1 * N + 1)]
+
+
+Mg24_w                     <- sol[21, (1*N + 2):(2 * N + 1)]
+Mg26_s                  <- sol[21, (2*N + 2):(3 * N + 1)]
+Mg24_s                 <- sol[21, (3*N + 2):(4 * N + 1)]
+  Li7_w                   <- sol[21, (4*N + 2):(5 * N + 1)]
+  
+  Li6_w                 <- sol[21, (5*N + 2):(6 * N + 1)]
+  
+  Li7_s                  <- sol[21, (6*N + 2):(7 * N + 1)]
+  Li6_s                  <- sol[21, (7*N + 2):(8 * N + 1)]
+
+
+# --------------------- convert results ------------------------------
+d26Mg_pw             <- ((Mg26_w/Mg24_w)/Mg_standard-1)*1000
+d26Mg_clay           <- ((Mg26_s/Mg24_s)/Mg_standard-1)*1000
+
+
+d7Li_pw             <- ((Li7_w/Li6_w)/Li_standard-1)*1000
+d7Li_clay           <- ((Li7_s/Li6_s)/Li_standard-1)*1000
+(Mg26_s+Mg24_s*(1+0.1/0.7899))/(Li7_s+ Li6_s)
+
+# -------------------------------------------------------- #
+# --------------------- plot results --------------------- #
+# -------------------------------------------------------- #
+par(mfrow=c(2,4))
+matplot(d26Mg_pw, grid_x.mid, xlab="d26Mg pw", ylab="depth [cm]",type="l", ylim=c(L,0), col=1, lty=1, lwd=3)
+matplot(d26Mg_clay, grid_x.mid, xlab="d26Mg Clay", ylab="depth [cm]",type="l", ylim=c(L,0), col=4, lty=1, lwd=3)
+
+matplot(d7Li_pw, grid_x.mid, xlab="d7Li_pw", ylab="depth [cm]",type="l", ylim=c(L,0), col=1, lty=1, lwd=3)
+matplot(d7Li_clay, grid_x.mid, xlab="d7Li_clay", ylab="depth [cm]",type="l", ylim=c(L,0), col=4, lty=1, lwd=3)
+
+
+
+
